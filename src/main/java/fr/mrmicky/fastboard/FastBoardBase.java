@@ -790,13 +790,13 @@ public abstract class FastBoardBase<T> {
             setField(team, CHAT_FORMAT_ENUM, RESET_FORMATTING); // Color
             setComponentField(team, prefix, 1); // Prefix
             setComponentField(team, suffix, 2); // Suffix
-            setField(team, String.class, visibility, 0); // Visibility
+            setField(team, String.class, visibility.toString(), 0); // Visibility
             setField(team, String.class, "always", 1); // Collisions
             setField(packet, Optional.class, Optional.of(team));
         } else {
             setComponentField(packet, prefix, 2); // Prefix
             setComponentField(packet, suffix, 3); // Suffix
-            setField(packet, String.class, visibility, 4); // Visibility for 1.8+
+            setField(packet, String.class, visibility.toString(), 4); // Visibility for 1.8+
             setField(packet, String.class, "always", 5); // Collisions for 1.9+
         }
 
