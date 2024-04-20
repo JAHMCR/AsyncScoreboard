@@ -438,6 +438,68 @@ public abstract class FastBoardBase<T> {
         }
     }
 
+    private void sendLineChange(int score) throws Throwable {
+        T prefix = getLineByScore(score);
+        T suffix = null;
+
+        if (hasLimitedCharacterLength()) {
+            String lineString = serializeLine(prefix);
+            List<String> splitLine = splitLine(lineString);
+
+            prefix = deserializeLine(splitLine.get(0));
+            suffix = deserializeLine(splitLine.get(1));
+        }
+
+        sendLineTeamPacket(score, TeamMode.UPDATE, prefix, suffix);
+    }
+
+    private List<String> splitLine(String line) {
+        int maxLength = hasLimitedCharacterLength() ? 16 : 1024;
+
+        String prefix, suffix = "";
+
+        if (line == null || line.isEmpty()) {
+            prefix = ChatColor.RESET.toString();
+        } else if (line.length() <= maxLength) {
+            prefix = line;
+        } else {
+            // Prevent splitting color codes
+            int index = line.charAt(maxLength - 1) == ChatColor.COLOR_CHAR
+                    ? (maxLength - 1) : maxLength;
+            prefix = line.substring(0, index);
+            String suffixTmp = line.substring(index);
+            ChatColor chatColor = null;
+
+            if (suffixTmp.length() >= 2 && suffixTmp.charAt(0) == ChatColor.COLOR_CHAR) {
+                chatColor = ChatColor.getByChar(suffixTmp.charAt(1));
+            }
+
+            String color = ChatColor.getLastColors(prefix);
+            boolean addColor = chatColor == null || chatColor.isFormat();
+
+            suffix = (addColor ? (color.isEmpty() ? ChatColor.RESET.toString() : color) : "") + suffixTmp;
+        }
+
+        if (prefix.length() > maxLength || suffix.length() > maxLength) {
+            // Something went wrong, just cut to prevent client crash/kick
+            prefix = prefix.substring(0, maxLength);
+            suffix = suffix.substring(0, maxLength);
+        }
+
+        return Arrays.asList(prefix, suffix);
+    }
+
+    /**
+     * Return if the player has a limited prefix/suffix character length.
+     * By default, it returns true only in 1.12 or lower.
+     * This method can be overridden to fix compatibility with some versions support plugin.
+     *
+     * @return max length
+     */
+    protected boolean hasLimitedCharacterLength() {
+        return !VersionType.V1_13.isHigherOrEqual();
+    }
+
     /**
      * Update how a specified line's score is displayed on the scoreboard. A null value will reset the displayed
      * text back to default. The scores will only be displayed for servers on 1.20.3 and higher.
@@ -632,11 +694,10 @@ public abstract class FastBoardBase<T> {
         this.deleted = true;
     }
 
-    protected abstract void sendLineChange(int score) throws Throwable;
-
     protected abstract Object toMinecraftComponent(T value) throws Throwable;
 
     protected abstract String serializeLine(T value);
+    protected abstract T deserializeLine(String value);
 
     protected abstract T emptyLine();
 

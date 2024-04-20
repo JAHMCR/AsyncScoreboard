@@ -23,7 +23,6 @@
  */
 package fr.mrmicky.fastboard;
 
-import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
 import java.lang.invoke.MethodHandle;
@@ -92,44 +91,6 @@ public class FastBoard extends FastBoardBase<String> {
     }
 
     @Override
-    protected void sendLineChange(int score) throws Throwable {
-        int maxLength = hasLinesMaxLength() ? 16 : 1024;
-        String line = getLineByScore(score);
-        String prefix;
-        String suffix = "";
-
-        if (line == null || line.isEmpty()) {
-            prefix = COLOR_CODES[score] + ChatColor.RESET;
-        } else if (line.length() <= maxLength) {
-            prefix = line;
-        } else {
-            // Prevent splitting color codes
-            int index = line.charAt(maxLength - 1) == ChatColor.COLOR_CHAR
-                    ? (maxLength - 1) : maxLength;
-            prefix = line.substring(0, index);
-            String suffixTmp = line.substring(index);
-            ChatColor chatColor = null;
-
-            if (suffixTmp.length() >= 2 && suffixTmp.charAt(0) == ChatColor.COLOR_CHAR) {
-                chatColor = ChatColor.getByChar(suffixTmp.charAt(1));
-            }
-
-            String color = ChatColor.getLastColors(prefix);
-            boolean addColor = chatColor == null || chatColor.isFormat();
-
-            suffix = (addColor ? (color.isEmpty() ? ChatColor.RESET.toString() : color) : "") + suffixTmp;
-        }
-
-        if (prefix.length() > maxLength || suffix.length() > maxLength) {
-            // Something went wrong, just cut to prevent client crash/kick
-            prefix = prefix.substring(0, maxLength);
-            suffix = suffix.substring(0, maxLength);
-        }
-
-        sendLineTeamPacket(score, TeamMode.UPDATE, prefix, suffix);
-    }
-
-    @Override
     protected Object toMinecraftComponent(String line) throws Throwable {
         if (line == null || line.isEmpty()) {
             return EMPTY_MESSAGE;
@@ -144,18 +105,12 @@ public class FastBoard extends FastBoardBase<String> {
     }
 
     @Override
-    protected String emptyLine() {
-        return "";
+    protected String deserializeLine(String value) {
+        return value;
     }
 
-    /**
-     * Return if the player has a prefix/suffix characters limit.
-     * By default, it returns true only in 1.12 or lower.
-     * This method can be overridden to fix compatibility with some versions support plugin.
-     *
-     * @return max length
-     */
-    protected boolean hasLinesMaxLength() {
-        return !VersionType.V1_13.isHigherOrEqual();
+    @Override
+    protected String emptyLine() {
+        return "";
     }
 }

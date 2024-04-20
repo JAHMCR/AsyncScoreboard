@@ -72,16 +72,6 @@ public class FastBoard extends FastBoardBase<Component> {
         super(player);
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    protected void sendLineChange(int score) throws Throwable {
-        Component line = getLineByScore(score);
-
-        sendLineTeamPacket(score, FastBoardBase.TeamMode.UPDATE, line, null);
-    }
-
     @Override
     protected Object toMinecraftComponent(Component component) throws Throwable {
         if (component == null) {
@@ -102,6 +92,11 @@ public class FastBoard extends FastBoardBase<Component> {
     @Override
     protected String serializeLine(Component value) {
         return LegacyComponentSerializer.legacySection().serialize(value);
+    }
+
+    @Override
+    protected Component deserializeLine(String value) {
+        return Component.text(value);
     }
 
     @Override
