@@ -196,7 +196,7 @@ public abstract class FastBoardBase<T> {
     private T title = emptyLine();
     private final List<T> lines = new ArrayList<>();
     private final List<T> scores = new ArrayList<>();
-    private final HashMap<String, T> prefixes = new HashMap<>();
+    private final HashMap<String, NameTagPrefix<T>> nameTagPrefixes = new HashMap<>();
 
     private boolean deleted = false;
 
@@ -522,12 +522,12 @@ public abstract class FastBoardBase<T> {
      *
      * @param prefixes the new scoreboard prefixes
      */
-    public synchronized void updateNameTagPrefixes(HashMap<String, T> prefixes) {
+    public synchronized void updateNameTagPrefixes(HashMap<String, NameTagPrefix<T>> prefixes) {
         Objects.requireNonNull(prefixes, "prefixes");
 
-        HashMap<String, T> oldPrefixes = new HashMap<>(this.prefixes);
-        this.prefixes.clear();
-        this.prefixes.putAll(prefixes);
+        HashMap<String, NameTagPrefix<T>> oldPrefixes = new HashMap<>(this.nameTagPrefixes);
+        this.nameTagPrefixes.clear();
+        this.nameTagPrefixes.putAll(prefixes);
 
         Set<String> addedPrefixes = prefixes.keySet();
         addedPrefixes.removeAll(oldPrefixes.keySet());
@@ -539,16 +539,20 @@ public abstract class FastBoardBase<T> {
         removedPrefixes.removeAll(prefixes.keySet());
 
         addedPrefixes.forEach(playerName -> {
+            NameTagPrefix<T> nameTagPrefix = prefixes.get(playerName);
+
             try {
-                sendPrefixTeamPacket(playerName, prefixes.get(playerName), TeamMode.CREATE);
+                sendNameTagTeamPacket(playerName, TeamMode.CREATE, nameTagPrefix.prefix, nameTagPrefix.visibility);
             } catch (Throwable t) {
                 throw new RuntimeException("Failed to add a scoreboard prefix", t);
             }
         });
 
         updatedPrefixes.forEach(playerName -> {
+            NameTagPrefix<T> nameTagPrefix = prefixes.get(playerName);
+
             try {
-                sendPrefixTeamPacket(playerName, prefixes.get(playerName), TeamMode.UPDATE);
+                sendNameTagTeamPacket(playerName, TeamMode.UPDATE, nameTagPrefix.prefix, nameTagPrefix.visibility);
             } catch (Throwable t) {
                 throw new RuntimeException("Failed to update a scoreboard prefix", t);
             }
@@ -752,8 +756,8 @@ public abstract class FastBoardBase<T> {
         sendRemoveTeamPacket(name);
     }
 
-    protected void sendPrefixTeamPacket(String name, T prefix, TeamMode mode) throws Throwable {
-        sendTeamPacket(name, mode, prefix, null, Collections.singletonList(name));
+    protected void sendNameTagTeamPacket(String name, TeamMode mode, T prefix, NameTagVisibility visibility) throws Throwable {
+        sendTeamPacket(name, mode, prefix, null, visibility, Collections.singletonList(name));
     }
 
     protected void sendRemoveTeamPacket(String name) throws Throwable {
@@ -761,6 +765,10 @@ public abstract class FastBoardBase<T> {
     }
 
     protected void sendTeamPacket(String name, TeamMode mode, T prefix, T suffix, List<String> entries) throws Throwable {
+        sendTeamPacket(name, mode, prefix, suffix, NameTagVisibility.ALWAYS, entries);
+    }
+
+    protected void sendTeamPacket(String name, TeamMode mode, T prefix, T suffix, NameTagVisibility visibility, List<String> entries) throws Throwable {
         if (mode == TeamMode.ADD_PLAYERS || mode == TeamMode.REMOVE_PLAYERS) {
             throw new UnsupportedOperationException();
         }
@@ -782,13 +790,13 @@ public abstract class FastBoardBase<T> {
             setField(team, CHAT_FORMAT_ENUM, RESET_FORMATTING); // Color
             setComponentField(team, prefix, 1); // Prefix
             setComponentField(team, suffix, 2); // Suffix
-            setField(team, String.class, "always", 0); // Visibility
+            setField(team, String.class, visibility, 0); // Visibility
             setField(team, String.class, "always", 1); // Collisions
             setField(packet, Optional.class, Optional.of(team));
         } else {
             setComponentField(packet, prefix, 2); // Prefix
             setComponentField(packet, suffix, 3); // Suffix
-            setField(packet, String.class, "always", 4); // Visibility for 1.8+
+            setField(packet, String.class, visibility, 4); // Visibility for 1.8+
             setField(packet, String.class, "always", 5); // Collisions for 1.9+
         }
 
@@ -862,6 +870,30 @@ public abstract class FastBoardBase<T> {
 
         public boolean isHigherOrEqual() {
             return VERSION_TYPE.ordinal() >= ordinal();
+        }
+    }
+
+    public static class NameTagPrefix<T> {
+        T prefix;
+        NameTagVisibility visibility;
+
+        NameTagPrefix(T prefix, NameTagVisibility visibility) {
+            this.prefix = prefix;
+            this.visibility = visibility;
+        }
+
+        NameTagPrefix(T prefix) {
+            this(prefix, NameTagVisibility.ALWAYS);
+        }
+    }
+
+    public enum NameTagVisibility {
+        ALWAYS,
+        NEVER;
+
+        @Override
+        public String toString() {
+            return this.name().toLowerCase();
         }
     }
 }
