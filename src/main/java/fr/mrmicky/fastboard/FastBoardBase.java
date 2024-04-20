@@ -877,12 +877,12 @@ public abstract class FastBoardBase<T> {
         T prefix;
         NameTagVisibility visibility;
 
-        NameTagPrefix(T prefix, NameTagVisibility visibility) {
+        public NameTagPrefix(T prefix, NameTagVisibility visibility) {
             this.prefix = prefix;
             this.visibility = visibility;
         }
 
-        NameTagPrefix(T prefix) {
+        public NameTagPrefix(T prefix) {
             this(prefix, NameTagVisibility.ALWAYS);
         }
     }
