@@ -79,7 +79,7 @@ public class FastBoard extends FastBoardBase<Component> {
     protected void sendLineChange(int score) throws Throwable {
         Component line = getLineByScore(score);
 
-        sendTeamPacket(score, FastBoardBase.TeamMode.UPDATE, line, null);
+        sendLineTeamPacket(score, FastBoardBase.TeamMode.UPDATE, line, null);
     }
 
     @Override

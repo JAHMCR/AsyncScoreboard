@@ -126,7 +126,7 @@ public class FastBoard extends FastBoardBase<String> {
             suffix = suffix.substring(0, maxLength);
         }
 
-        sendTeamPacket(score, TeamMode.UPDATE, prefix, suffix);
+        sendLineTeamPacket(score, TeamMode.UPDATE, prefix, suffix);
     }
 
     @Override

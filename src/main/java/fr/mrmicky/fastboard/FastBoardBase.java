@@ -190,12 +190,13 @@ public abstract class FastBoardBase<T> {
         }
     }
 
-    private final Player player;
     private final String id;
+    private final Player player;
 
+    private T title = emptyLine();
     private final List<T> lines = new ArrayList<>();
     private final List<T> scores = new ArrayList<>();
-    private T title = emptyLine();
+    private final HashMap<String, T> prefixes = new HashMap<>();
 
     private boolean deleted = false;
 
@@ -412,14 +413,14 @@ public abstract class FastBoardBase<T> {
 
                 if (oldLines.size() > linesSize) {
                     for (int i = oldLinesCopy.size(); i > linesSize; i--) {
-                        sendTeamPacket(i - 1, TeamMode.REMOVE);
+                        sendRemoveLineTeamPacket(i - 1);
                         sendScorePacket(i - 1, ScoreboardAction.REMOVE);
                         oldLines.remove(0);
                     }
                 } else {
                     for (int i = oldLinesCopy.size(); i < linesSize; i++) {
                         sendScorePacket(i, ScoreboardAction.CHANGE);
-                        sendTeamPacket(i, TeamMode.CREATE, null, null);
+                        sendLineTeamPacket(i, TeamMode.CREATE, null, null);
                     }
                 }
             }
@@ -517,6 +518,52 @@ public abstract class FastBoardBase<T> {
     }
 
     /**
+     * Update the name tag prefixes.
+     *
+     * @param prefixes the new scoreboard prefixes
+     */
+    public synchronized void updateNameTagPrefixes(HashMap<String, T> prefixes) {
+        Objects.requireNonNull(prefixes, "prefixes");
+
+        HashMap<String, T> oldPrefixes = new HashMap<>(this.prefixes);
+        this.prefixes.clear();
+        this.prefixes.putAll(prefixes);
+
+        Set<String> addedPrefixes = prefixes.keySet();
+        addedPrefixes.removeAll(oldPrefixes.keySet());
+
+        Set<String> updatedPrefixes = prefixes.keySet();
+        updatedPrefixes.removeAll(addedPrefixes);
+
+        Set<String> removedPrefixes = oldPrefixes.keySet();
+        removedPrefixes.removeAll(prefixes.keySet());
+
+        addedPrefixes.forEach(playerName -> {
+            try {
+                sendPrefixTeamPacket(playerName, prefixes.get(playerName), TeamMode.CREATE);
+            } catch (Throwable t) {
+                throw new RuntimeException("Failed to add a scoreboard prefix", t);
+            }
+        });
+
+        updatedPrefixes.forEach(playerName -> {
+            try {
+                sendPrefixTeamPacket(playerName, prefixes.get(playerName), TeamMode.UPDATE);
+            } catch (Throwable t) {
+                throw new RuntimeException("Failed to update a scoreboard prefix", t);
+            }
+        });
+
+        removedPrefixes.forEach(playerName -> {
+            try {
+                sendRemoveTeamPacket(playerName);
+            } catch (Throwable t) {
+                throw new RuntimeException("Failed to remove a scoreboard prefix", t);
+            }
+        });
+    }
+
+    /**
      * Get the player who has the scoreboard.
      *
      * @return current player for this FastBoard
@@ -570,7 +617,7 @@ public abstract class FastBoardBase<T> {
     public void delete() {
         try {
             for (int i = 0; i < this.lines.size(); i++) {
-                sendTeamPacket(i, TeamMode.REMOVE);
+                sendRemoveLineTeamPacket(i);
             }
 
             sendObjectivePacket(ObjectiveMode.REMOVE);
@@ -692,19 +739,35 @@ public abstract class FastBoardBase<T> {
         sendPacket(PACKET_SB_SET_SCORE.invoke(objName, this.id, score, null, format));
     }
 
-    protected void sendTeamPacket(int score, TeamMode mode) throws Throwable {
-        sendTeamPacket(score, mode, null, null);
+    protected void sendLineTeamPacket(int score, TeamMode mode, T prefix, T suffix) throws Throwable {
+        String name = getLineTeamName(score);
+        List<String> entries = Collections.singletonList(COLOR_CODES[score]);
+
+        sendTeamPacket(name, mode, prefix, suffix, entries);
     }
 
-    protected void sendTeamPacket(int score, TeamMode mode, T prefix, T suffix)
-            throws Throwable {
+    protected void sendRemoveLineTeamPacket(int score) throws Throwable {
+        String name = getLineTeamName(score);
+
+        sendRemoveTeamPacket(name);
+    }
+
+    protected void sendPrefixTeamPacket(String name, T prefix, TeamMode mode) throws Throwable {
+        sendTeamPacket(name, mode, prefix, null, Collections.singletonList(name));
+    }
+
+    protected void sendRemoveTeamPacket(String name) throws Throwable {
+        sendTeamPacket(name, TeamMode.REMOVE, null, null, Collections.emptyList());
+    }
+
+    protected void sendTeamPacket(String name, TeamMode mode, T prefix, T suffix, List<String> entries) throws Throwable {
         if (mode == TeamMode.ADD_PLAYERS || mode == TeamMode.REMOVE_PLAYERS) {
             throw new UnsupportedOperationException();
         }
 
         Object packet = PACKET_SB_TEAM.invoke();
 
-        setField(packet, String.class, this.id + ':' + score); // Team name
+        setField(packet, String.class, name); // Team name
         setField(packet, int.class, mode.ordinal(), VERSION_TYPE == VersionType.V1_8 ? 1 : 0); // Update mode
 
         if (mode == TeamMode.REMOVE) {
@@ -730,7 +793,7 @@ public abstract class FastBoardBase<T> {
         }
 
         if (mode == TeamMode.CREATE) {
-            setField(packet, Collection.class, Collections.singletonList(COLOR_CODES[score])); // Players in the team
+            setField(packet, Collection.class, entries); // Entries in the team
         }
 
         sendPacket(packet);
@@ -776,6 +839,10 @@ public abstract class FastBoardBase<T> {
                 field.set(packet, toMinecraftComponent(value));
             }
         }
+    }
+
+    private String getLineTeamName(int score) {
+        return this.id + ':' + score;
     }
 
     public enum ObjectiveMode {
