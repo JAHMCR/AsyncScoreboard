@@ -25,6 +25,7 @@ package fr.mrmicky.fastboard;
 
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -55,7 +56,6 @@ public abstract class FastBoardBase<T> {
     // Packets and components
     private static final Class<?> CHAT_COMPONENT_CLASS;
     private static final Class<?> CHAT_FORMAT_ENUM;
-    private static final Object RESET_FORMATTING;
     private static final MethodHandle PLAYER_CONNECTION;
     private static final MethodHandle SEND_PACKET;
     private static final MethodHandle PLAYER_GET_HANDLE;
@@ -115,7 +115,6 @@ public abstract class FastBoardBase<T> {
             CHAT_COMPONENT_CLASS = FastReflection.nmsClass("network.chat", "IChatBaseComponent");
             CHAT_FORMAT_ENUM = FastReflection.nmsClass(null, "EnumChatFormat");
             DISPLAY_SLOT_TYPE = displaySlotEnum.orElse(int.class);
-            RESET_FORMATTING = FastReflection.enumValueOf(CHAT_FORMAT_ENUM, "RESET", 21);
             SIDEBAR_DISPLAY_SLOT = displaySlotEnum.isPresent() ? FastReflection.enumValueOf(DISPLAY_SLOT_TYPE, "SIDEBAR", 1) : 1;
             PLAYER_GET_HANDLE = lookup.findVirtual(craftPlayerClass, "getHandle", MethodType.methodType(entityPlayerClass));
             PLAYER_CONNECTION = lookup.unreflectGetter(playerConnectionField);
@@ -196,7 +195,7 @@ public abstract class FastBoardBase<T> {
     private T title = emptyLine();
     private final List<T> lines = new ArrayList<>();
     private final List<T> scores = new ArrayList<>();
-    private final HashMap<String, NameTagPrefix<T>> nameTagPrefixes = new HashMap<>();
+    private final HashMap<String, NameTag<T>> nameTags = new HashMap<>();
 
     private boolean deleted = false;
 
@@ -297,8 +296,8 @@ public abstract class FastBoardBase<T> {
      * Update a single scoreboard line including how its score is displayed.
      * The score will only be displayed on 1.20.3 and higher.
      *
-     * @param line the line number
-     * @param text the new line text
+     * @param line      the line number
+     * @param text      the new line text
      * @param scoreText the new line's score, if null will not change current value
      * @throws IndexOutOfBoundsException if the line is higher than {@link #size() size() + 1}
      */
@@ -383,7 +382,7 @@ public abstract class FastBoardBase<T> {
      * Update the lines and how their score is displayed on the scoreboard.
      * The scores will only be displayed for servers on 1.20.3 and higher.
      *
-     * @param lines the new scoreboard lines
+     * @param lines  the new scoreboard lines
      * @param scores the set for how each line's score should be, if null will fall back to default (blank)
      * @throws IllegalArgumentException if one line is longer than 30 chars on 1.12 or lower
      * @throws IllegalArgumentException if lines and scores are not the same size
@@ -580,51 +579,51 @@ public abstract class FastBoardBase<T> {
     }
 
     /**
-     * Update the name tag prefixes.
+     * Update the name tag nameTags.
      *
-     * @param prefixes the new scoreboard prefixes
+     * @param nameTags the new scoreboard nameTags
      */
-    public synchronized void updateNameTagPrefixes(HashMap<String, NameTagPrefix<T>> prefixes) {
-        Objects.requireNonNull(prefixes, "prefixes");
+    public synchronized void updateNameTagPrefixes(HashMap<String, NameTag<T>> nameTags) {
+        Objects.requireNonNull(nameTags, "nameTags");
 
-        HashMap<String, NameTagPrefix<T>> oldPrefixes = new HashMap<>(this.nameTagPrefixes);
-        this.nameTagPrefixes.clear();
-        this.nameTagPrefixes.putAll(prefixes);
+        HashMap<String, NameTag<T>> oldNameTags = new HashMap<>(this.nameTags);
+        this.nameTags.clear();
+        this.nameTags.putAll(nameTags);
 
-        Set<String> addedPrefixes = prefixes.keySet();
-        addedPrefixes.removeAll(oldPrefixes.keySet());
+        Set<String> addedPrefixes = nameTags.keySet();
+        addedPrefixes.removeAll(oldNameTags.keySet());
 
-        Set<String> updatedPrefixes = prefixes.keySet();
+        Set<String> updatedPrefixes = nameTags.keySet();
         updatedPrefixes.removeAll(addedPrefixes);
 
-        Set<String> removedPrefixes = oldPrefixes.keySet();
-        removedPrefixes.removeAll(prefixes.keySet());
+        Set<String> removedPrefixes = oldNameTags.keySet();
+        removedPrefixes.removeAll(nameTags.keySet());
 
-        addedPrefixes.forEach(playerName -> {
-            NameTagPrefix<T> nameTagPrefix = prefixes.get(playerName);
+        addedPrefixes.forEach(teamName -> {
+            NameTag<T> nameTag = nameTags.get(teamName);
 
             try {
-                sendNameTagTeamPacket(playerName, TeamMode.CREATE, nameTagPrefix.prefix, nameTagPrefix.visibility);
+                sendNameTagTeamPacket(teamName, TeamMode.CREATE, nameTag);
             } catch (Throwable t) {
-                throw new RuntimeException("Failed to add a scoreboard prefix", t);
+                throw new RuntimeException("Failed to add a scoreboard name tag", t);
             }
         });
 
-        updatedPrefixes.forEach(playerName -> {
-            NameTagPrefix<T> nameTagPrefix = prefixes.get(playerName);
+        updatedPrefixes.forEach(teamName -> {
+            NameTag<T> nameTag = nameTags.get(teamName);
 
             try {
-                sendNameTagTeamPacket(playerName, TeamMode.UPDATE, nameTagPrefix.prefix, nameTagPrefix.visibility);
+                sendNameTagTeamPacket(teamName, TeamMode.UPDATE, nameTag);
             } catch (Throwable t) {
-                throw new RuntimeException("Failed to update a scoreboard prefix", t);
+                throw new RuntimeException("Failed to update a scoreboard name tag", t);
             }
         });
 
-        removedPrefixes.forEach(playerName -> {
+        removedPrefixes.forEach(teamName -> {
             try {
-                sendRemoveTeamPacket(playerName);
+                sendRemoveTeamPacket(teamName);
             } catch (Throwable t) {
-                throw new RuntimeException("Failed to remove a scoreboard prefix", t);
+                throw new RuntimeException("Failed to remove a scoreboard name tag", t);
             }
         });
     }
@@ -697,6 +696,7 @@ public abstract class FastBoardBase<T> {
     protected abstract Object toMinecraftComponent(T value) throws Throwable;
 
     protected abstract String serializeLine(T value);
+
     protected abstract T deserializeLine(String value);
 
     protected abstract T emptyLine();
@@ -805,38 +805,38 @@ public abstract class FastBoardBase<T> {
     }
 
     protected void sendLineTeamPacket(int score, TeamMode mode, T prefix, T suffix) throws Throwable {
-        String name = getLineTeamName(score);
+        String teamName = getLineTeamName(score);
         List<String> entries = Collections.singletonList(COLOR_CODES[score]);
 
-        sendTeamPacket(name, mode, prefix, suffix, entries);
+        sendTeamPacket(teamName, mode, prefix, suffix, entries);
     }
 
     protected void sendRemoveLineTeamPacket(int score) throws Throwable {
-        String name = getLineTeamName(score);
+        String teamName = getLineTeamName(score);
 
-        sendRemoveTeamPacket(name);
+        sendRemoveTeamPacket(teamName);
     }
 
-    protected void sendNameTagTeamPacket(String name, TeamMode mode, T prefix, NameTagVisibility visibility) throws Throwable {
-        sendTeamPacket(name, mode, prefix, null, visibility, Collections.singletonList(name));
+    protected void sendNameTagTeamPacket(String teamName, TeamMode mode, @NotNull FastBoardBase.NameTag<T> nameTag) throws Throwable {
+        sendTeamPacket(teamName, mode, nameTag.prefix, null, nameTag.color, nameTag.visibility, Collections.singletonList(nameTag.playerName));
     }
 
-    protected void sendRemoveTeamPacket(String name) throws Throwable {
-        sendTeamPacket(name, TeamMode.REMOVE, null, null, Collections.emptyList());
+    protected void sendRemoveTeamPacket(String teamName) throws Throwable {
+        sendTeamPacket(teamName, TeamMode.REMOVE, null, null, Collections.emptyList());
     }
 
-    protected void sendTeamPacket(String name, TeamMode mode, T prefix, T suffix, List<String> entries) throws Throwable {
-        sendTeamPacket(name, mode, prefix, suffix, NameTagVisibility.ALWAYS, entries);
+    protected void sendTeamPacket(String teamName, TeamMode mode, T prefix, T suffix, List<String> entries) throws Throwable {
+        sendTeamPacket(teamName, mode, prefix, suffix, ChatColor.RESET, NameTagVisibility.ALWAYS, entries);
     }
 
-    protected void sendTeamPacket(String name, TeamMode mode, T prefix, T suffix, NameTagVisibility visibility, List<String> entries) throws Throwable {
+    protected void sendTeamPacket(String teamName, TeamMode mode, T prefix, T suffix, ChatColor chatColor, NameTagVisibility visibility, List<String> entries) throws Throwable {
         if (mode == TeamMode.ADD_PLAYERS || mode == TeamMode.REMOVE_PLAYERS) {
             throw new UnsupportedOperationException();
         }
 
         Object packet = PACKET_SB_TEAM.invoke();
 
-        setField(packet, String.class, name); // Team name
+        setField(packet, String.class, teamName); // Team name
         setField(packet, int.class, mode.ordinal(), VERSION_TYPE == VersionType.V1_8 ? 1 : 0); // Update mode
 
         if (mode == TeamMode.REMOVE) {
@@ -848,7 +848,7 @@ public abstract class FastBoardBase<T> {
             Object team = PACKET_SB_SERIALIZABLE_TEAM.invoke();
             // Since the packet is initialized with null values, we need to change more things.
             setComponentField(team, null, 0); // Display name
-            setField(team, CHAT_FORMAT_ENUM, RESET_FORMATTING); // Color
+            setField(team, CHAT_FORMAT_ENUM, chatColor.ordinal()); // Color
             setComponentField(team, prefix, 1); // Prefix
             setComponentField(team, suffix, 2); // Suffix
             setField(team, String.class, visibility.toString(), 0); // Visibility
@@ -934,17 +934,21 @@ public abstract class FastBoardBase<T> {
         }
     }
 
-    public static class NameTagPrefix<T> {
+    public static class NameTag<T> {
+        String playerName;
         T prefix;
+        ChatColor color;
         NameTagVisibility visibility;
 
-        public NameTagPrefix(T prefix, NameTagVisibility visibility) {
+        public NameTag(String playerName, T prefix, ChatColor color, NameTagVisibility visibility) {
+            this.playerName = playerName;
             this.prefix = prefix;
+            this.color = color;
             this.visibility = visibility;
         }
 
-        public NameTagPrefix(T prefix) {
-            this(prefix, NameTagVisibility.ALWAYS);
+        public NameTag(String playerName, T prefix, ChatColor color) {
+            this(playerName, prefix, color, NameTagVisibility.ALWAYS);
         }
     }
 
