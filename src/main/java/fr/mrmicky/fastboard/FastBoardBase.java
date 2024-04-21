@@ -579,11 +579,11 @@ public abstract class FastBoardBase<T> {
     }
 
     /**
-     * Update the name tag nameTags.
+     * Update the scoreboard name tags.
      *
      * @param nameTags the new scoreboard nameTags
      */
-    public synchronized void updateNameTagPrefixes(HashMap<String, NameTag<T>> nameTags) {
+    public synchronized void updateNameTags(HashMap<String, NameTag<T>> nameTags) {
         Objects.requireNonNull(nameTags, "nameTags");
 
         HashMap<String, NameTag<T>> oldNameTags = new HashMap<>(this.nameTags);
@@ -846,9 +846,10 @@ public abstract class FastBoardBase<T> {
 
         if (VersionType.V1_17.isHigherOrEqual()) {
             Object team = PACKET_SB_SERIALIZABLE_TEAM.invoke();
+            Object chatColorObject = FastReflection.enumValueOf(CHAT_FORMAT_ENUM, chatColor.name(), 21);
             // Since the packet is initialized with null values, we need to change more things.
             setComponentField(team, null, 0); // Display name
-            setField(team, CHAT_FORMAT_ENUM, chatColor.ordinal()); // Color
+            setField(team, CHAT_FORMAT_ENUM, chatColorObject); // Color
             setComponentField(team, prefix, 1); // Prefix
             setComponentField(team, suffix, 2); // Suffix
             setField(team, String.class, visibility.toString(), 0); // Visibility
