@@ -581,25 +581,33 @@ public abstract class FastBoardBase<T> {
     /**
      * Update the scoreboard name tags.
      *
-     * @param nameTags the new scoreboard nameTags
+     * @param nameTags the new scoreboard name tags
      */
     public synchronized void updateNameTags(HashMap<String, NameTag<T>> nameTags) {
-        Objects.requireNonNull(nameTags, "nameTags");
+        Set<String> addedNameTags = new HashSet<>();
+        Set<String> updatedNameTags = new HashSet<>();
+        Set<String> removedNameTags = new HashSet<>();
 
-        HashMap<String, NameTag<T>> oldNameTags = new HashMap<>(this.nameTags);
-        this.nameTags.clear();
-        this.nameTags.putAll(nameTags);
+        Set<String> currentKeys = this.nameTags.keySet();
+        Set<String> nameTagsKeys = nameTags.keySet();
 
-        Set<String> addedPrefixes = nameTags.keySet();
-        addedPrefixes.removeAll(oldNameTags.keySet());
+        // Identify added and updated name tags
+        for (String key : nameTagsKeys) {
+            if (!currentKeys.contains(key)) {
+                addedNameTags.add(key);
+            } else {
+                updatedNameTags.add(key);
+            }
+        }
 
-        Set<String> updatedPrefixes = nameTags.keySet();
-        updatedPrefixes.removeAll(addedPrefixes);
+        // Identify removed name tags
+        for (String key : currentKeys) {
+            if (!nameTagsKeys.contains(key)) {
+                removedNameTags.add(key);
+            }
+        }
 
-        Set<String> removedPrefixes = oldNameTags.keySet();
-        removedPrefixes.removeAll(nameTags.keySet());
-
-        addedPrefixes.forEach(teamName -> {
+        addedNameTags.forEach(teamName -> {
             NameTag<T> nameTag = nameTags.get(teamName);
 
             try {
@@ -609,7 +617,7 @@ public abstract class FastBoardBase<T> {
             }
         });
 
-        updatedPrefixes.forEach(teamName -> {
+        updatedNameTags.forEach(teamName -> {
             NameTag<T> nameTag = nameTags.get(teamName);
 
             try {
@@ -619,13 +627,16 @@ public abstract class FastBoardBase<T> {
             }
         });
 
-        removedPrefixes.forEach(teamName -> {
+        removedNameTags.forEach(teamName -> {
             try {
                 sendRemoveTeamPacket(teamName);
             } catch (Throwable t) {
                 throw new RuntimeException("Failed to remove a scoreboard name tag", t);
             }
         });
+
+        this.nameTags.clear();
+        this.nameTags.putAll(nameTags);
     }
 
     /**
