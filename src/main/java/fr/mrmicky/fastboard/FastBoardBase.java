@@ -23,6 +23,7 @@
  */
 package fr.mrmicky.fastboard;
 
+import fr.mrmicky.fastboard.util.RegexUtil;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
@@ -465,37 +466,7 @@ public abstract class FastBoardBase<T> {
     private List<String> splitLine(String line) {
         int maxLength = hasLimitedCharacterLength() ? 16 : 1024;
 
-        String prefix, suffix = "";
-
-        if (line == null || line.isEmpty()) {
-            prefix = ChatColor.RESET.toString();
-        } else if (line.length() <= maxLength) {
-            prefix = line;
-        } else {
-            // Prevent splitting color codes
-            int index = line.charAt(maxLength - 1) == ChatColor.COLOR_CHAR
-                    ? (maxLength - 1) : maxLength;
-            prefix = line.substring(0, index);
-            String suffixTmp = line.substring(index);
-            ChatColor chatColor = null;
-
-            if (suffixTmp.length() >= 2 && suffixTmp.charAt(0) == ChatColor.COLOR_CHAR) {
-                chatColor = ChatColor.getByChar(suffixTmp.charAt(1));
-            }
-
-            String color = ChatColor.getLastColors(prefix);
-            boolean addColor = chatColor == null || chatColor.isFormat();
-
-            suffix = (addColor ? (color.isEmpty() ? ChatColor.RESET.toString() : color) : "") + suffixTmp;
-        }
-
-        if (prefix.length() > maxLength || suffix.length() > maxLength) {
-            // Something went wrong, just cut to prevent client crash/kick
-            prefix = prefix.substring(0, maxLength);
-            suffix = suffix.substring(0, maxLength);
-        }
-
-        return Arrays.asList(prefix, suffix);
+        return new RegexUtil().splitLine(line, maxLength);
     }
 
     /**
