@@ -71,42 +71,6 @@ public class RegexUtil {
             builders[0].append(line);
         } else {
             assignPrefixSuffix.accept(line, builders);
-
-            String suffix = builders[1].toString();
-
-            // Check for line truncation
-            if (!suffix.isEmpty()) {
-                String lastLineComponent = "";
-                String lastSuffixComponent = "";
-
-                Matcher lineMatcher = splitPattern.matcher(line);
-
-                // Find the last component in the line
-                while (lineMatcher.find()) {
-                    lastLineComponent = lineMatcher.group();
-                }
-
-                Matcher suffixMatcher = splitPattern.matcher(suffix);
-
-                // Find the last component in the suffix
-                while (suffixMatcher.find()) {
-                    lastSuffixComponent = suffixMatcher.group();
-                }
-
-                // Try removing italic format if the line was truncated
-                if (!lastLineComponent.equals(lastSuffixComponent)) {
-                    String italicRegex = "[" + SECTION_SYMBOL + CHAT_COLOR_SYMBOL + "]o";
-
-                    line = line.replaceAll(italicRegex, "");
-
-                    // Reset prefix and suffix
-                    builders[0].setLength(0);
-                    builders[1].setLength(0);
-
-                    // Reassign prefix and suffix
-                    assignPrefixSuffix.accept(line, builders);
-                }
-            }
         }
 
         result.add(builders[0].toString());
