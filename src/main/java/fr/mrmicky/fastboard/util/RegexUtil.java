@@ -32,32 +32,34 @@ public class RegexUtil {
 
             while (splitMatcher.find()) {
                 String component = splitMatcher.group();
-                int remainingPrefixLength = maxLength - prefix.length();
-                int remainingSuffixLength = maxLength - suffix.length();
+
+                int availablePrefixLength = maxLength - prefix.length();
+                int availableSuffixLength = maxLength - suffix.length();
 
                 if (suffix.length() > 0) {
-                    // Handle suffix
-                    if (remainingSuffixLength > 0) {
-                        suffix.append(component, 0, Math.min(component.length(), remainingSuffixLength));
-                    }
-                } else if (remainingPrefixLength >= component.length()) {
-                    // Handle prefix
+                    // If there's something in suffix, we only handle suffix
+                    suffix.append(component, 0, Math.min(component.length(), availableSuffixLength));
+                } else if (availablePrefixLength >= component.length()) {
+                    // Add component to prefix if it fits entirely
                     prefix.append(component);
                 } else {
                     // Split component between prefix and suffix
                     Matcher formatMatcher = formatPattern.matcher(component);
                     String format = formatMatcher.find() ? formatMatcher.group() : "";
-
                     String content = component.substring(format.length());
-                    int remainingContentLength = remainingPrefixLength - format.length();
 
-                    if (remainingContentLength > 0) {
-                        int remainingLength = remainingContentLength + remainingSuffixLength;
+                    int availablePrefixContentLength = Math.max(availablePrefixLength - format.length(), 0);
+                    int availableSuffixContentLength = Math.max(availableSuffixLength - format.length(), 0);
 
-                        prefix.append(format).append(content, 0, remainingContentLength);
-                        suffix.append(format).append(content, remainingContentLength, Math.min(content.length(), remainingLength));
+                    if (availablePrefixContentLength > 0) {
+                        // Split content between prefix and suffix
+                        int splitPoint = Math.min(content.length(), availablePrefixContentLength);
+
+                        prefix.append(format).append(content, 0, splitPoint);
+                        suffix.append(format).append(content, splitPoint, Math.min(content.length(), splitPoint + availableSuffixContentLength));
                     } else {
-                        suffix.append(component, 0, Math.min(component.length(), remainingSuffixLength));
+                        // If prefix is full, directly append to suffix
+                        suffix.append(format).append(content, 0, Math.min(content.length(), availableSuffixContentLength));
                     }
                 }
             }
