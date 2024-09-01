@@ -814,7 +814,7 @@ public abstract class FastBoardBase<T> {
     }
 
     protected void sendNameTagTeamPacket(String teamName, TeamMode mode, @NotNull FastBoardBase.NameTag<T> nameTag) throws Throwable {
-        sendTeamPacket(teamName, mode, nameTag.prefix, null, nameTag.color, nameTag.visibility, Collections.singletonList(nameTag.playerName));
+        sendTeamPacket(teamName, mode, nameTag.prefix, nameTag.suffix, nameTag.color, nameTag.visibility, Collections.singletonList(nameTag.playerName));
     }
 
     protected void sendRemoveTeamPacket(String teamName) throws Throwable {
@@ -934,18 +934,20 @@ public abstract class FastBoardBase<T> {
     public static class NameTag<T> {
         String playerName;
         T prefix;
+        T suffix;
         ChatColor color;
         NameTagVisibility visibility;
 
-        public NameTag(String playerName, T prefix, ChatColor color, NameTagVisibility visibility) {
+        public NameTag(String playerName, T prefix, T suffix, ChatColor color, NameTagVisibility visibility) {
             this.playerName = playerName;
             this.prefix = prefix;
+            this.suffix = suffix;
             this.color = color;
             this.visibility = visibility;
         }
 
-        public NameTag(String playerName, T prefix, ChatColor color) {
-            this(playerName, prefix, color, NameTagVisibility.ALWAYS);
+        public NameTag(String playerName, T prefix, T suffix, ChatColor color) {
+            this(playerName, prefix, suffix, color, NameTagVisibility.ALWAYS);
         }
     }
 
